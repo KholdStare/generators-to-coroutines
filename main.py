@@ -25,6 +25,14 @@ def genPairs(iterable):
 
 
 @invertibleGenerator(globals())
+def genFilter(predicate, iterable):
+
+    for elem in iterable:
+        if predicate(elem):
+            yield elem
+
+
+@invertibleGenerator(globals())
 def genPassthrough(iterable):
     for val in iterable:
         yield val
@@ -39,12 +47,28 @@ def coReceive():
 
 if __name__ == "__main__":
 
+    text = """Lorem ipsum dolor sit amet, consectetuer adipiscing elit, sed
+    diam nonummy nibh euismod tincidunt ut laoreet dolore magna aliquam erat
+    volutpat. Ut wisi enim ad minim veniam, quis nostrud exerci tation
+    ullamcorper suscipit lobortis nisl ut aliquip ex ea commodo consequat. Duis
+    autem vel eum iriure dolor in hendrerit in vulputate velit esse molestie
+    consequat, vel illum dolore eu feugiat nulla facilisis at vero eros et
+    accumsan et iusto odio dignissim qui blandit praesent luptatum zzril
+    delenit augue duis dolore te feugait nulla facilisi. Nam liber tempor cum
+    soluta nobis eleifend option congue nihil imperdiet doming id quod mazim"""
+
+    words = text.split()
+
+    predicate = lambda word: len(word) > 9
+
     print "Generators:"
-    for val in genPassthrough(genPairs(xrange(0, 9))):
+    for val in genPairs(genFilter(predicate, genPassthrough(words))):
         print "Got %s" % str(val)
 
     print "Coroutines:"
-    sourceFromIterable(xrange(0, 9),
-                       genPairs.co(
+    sourceFromIterable(words,
                        genPassthrough.co(
-                       coReceive())))
+                       genFilter.co(predicate,
+                       genPairs.co(
+                       coReceive()
+                       ))))
