@@ -1,21 +1,7 @@
 #!/usr/bin/env python
 
-from codecorate import *
+from codecorate import (invertibleGenerator, coroutine)
 
-######
-# Coroutine stuff
-
-@coroutine
-def coFilter(target):
-    buf = []
-
-    while True:
-        elem = (yield)
-        buf.append(elem)
-
-        if len(buf) >= 2:
-            target.send(buf)
-            buf = []
 
 # is currying necessary?
 def sourceFromIterable(iterable):
@@ -32,40 +18,39 @@ def sourceFromIterable(iterable):
 #####
 # Gen stuff
 
-@invertibleGenerator
-def genFilter(iterable):
-    
+@invertibleGenerator(globals())
+def genPairs(iterable):
+
     buf = []
 
     for elem in iterable:
         buf.append(elem)
 
         if len(buf) >= 2:
-            yield buf
+            yield tuple(buf)
             buf = []
 
-@coroutine
-def receiver():
-    print("Ready to receive")
-    while True:
-        n = (yield)
-        print("Got %s" % n)
 
-@invertibleGenerator
-def simpleGen(iterable):
+@invertibleGenerator(globals())
+def genPassthrough(iterable):
     for val in iterable:
         yield val
 
+
 @coroutine
-def simpleCo(target):
+def receiver():
+    print "Ready to receive"
     while True:
         val = (yield)
-        target.send(val)
+        print "Got %s" % str(val)
 
 if __name__ == "__main__":
-    
-    sourceFromIterable(xrange(0,9))(genFilter.co(
-                                    simpleGen.co(
-                                    receiver())))
 
+    print "Generators:"
+    for val in genPassthrough(genPairs(xrange(0, 9))):
+        print "Got %s" % str(val)
 
+    print "Coroutines:"
+    sourceFromIterable(xrange(0, 9))(genPairs.co(
+                                     genPassthrough.co(
+                                     receiver())))

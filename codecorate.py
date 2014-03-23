@@ -1,13 +1,15 @@
-import dis
 import ast
 import inspect
 import astpp
+import copy
+
 
 def viewAst(obj):
     node = ast.parse(inspect.getsource(obj))
     print astpp.dump(node)
 
     return obj
+
 
 def coroutine(func):
     def start(*args, **kwargs):
@@ -16,11 +18,19 @@ def coroutine(func):
         return g
     return start
 
-def invertibleGenerator(func):
-    """ Add a co method to func, that is the equivalent coroutine. """
 
-    func.co = coroutine(transformAstWith(InvertGenerator)(func))
-    return func
+def invertibleGenerator(globalEnv):
+    """ Add a co method to a generator function, that is the equivalent
+    coroutine. """
+
+    def decorator(func):
+        func.co = coroutine(transformAstWith(
+            globalEnv, [InvertGenerator])(func)
+        )
+        return func
+
+    return decorator
+
 
 class InvertGenerator(ast.NodeTransformer):
     # TODO: should probably be a two-pass procedure:
@@ -43,12 +53,11 @@ class InvertGenerator(ast.NodeTransformer):
 
         return node
 
-
     def isForStatementCandidate(self, node):
 
         return self.functionArguments is not None and \
-                isinstance(node.iter, ast.Name) and \
-                node.iter.id in (arg.id for arg in self.functionArguments)
+            isinstance(node.iter, ast.Name) and \
+            node.iter.id in (arg.id for arg in self.functionArguments)
 
     def visit_For(self, node):
         """ Change iteration into while-yield statements """
@@ -57,18 +66,18 @@ class InvertGenerator(ast.NodeTransformer):
 
         newnode = node
         if self.isForStatementCandidate(node):
-	    #| For(expr target, expr iter, stmt* body, stmt* orelse)
-	    #| While(expr test, stmt* body, stmt* orelse)
+            # For(expr target, expr iter, stmt* body, stmt* orelse)
+            # While(expr test, stmt* body, stmt* orelse)
 
             # save the iterable, which will be now used as a target instead.
             self.target = node.iter
 
             newbody = [ast.Assign(targets=[node.target],
-                                value=ast.Yield(value=None))] + node.body
+                                  value=ast.Yield(value=None))] + node.body
             newnode = ast.While(
-                    test = ast.Name(id='True', ctx=ast.Load()),
-                    body = newbody,
-                    orelse = []) # TODO: what to do with orelse
+                test=ast.Name(id='True', ctx=ast.Load()),
+                body=newbody,
+                orelse=[])  # TODO: what to do with orelse
 
         self.generic_visit(newnode)
 
@@ -76,16 +85,15 @@ class InvertGenerator(ast.NodeTransformer):
 
     def coroutineSendExpression(self, target, exprToSend):
         return ast.Expr(value=ast.Call(
-                    func = ast.Attribute(
-                            value = target,
-                            attr = 'send',
-                            ctx = ast.Load()),
-                    args=[exprToSend],
-                    keywords=[],
-                    starargs=None,
-                    kwargs=None
-                    )
-                )
+            func=ast.Attribute(
+                value=target,
+                attr='send',
+                ctx=ast.Load()),
+            args=[exprToSend],
+            keywords=[],
+            starargs=None,
+            kwargs=None
+            ))
 
     def extractValueFromYieldExpr(self, expr):
 
@@ -94,16 +102,15 @@ class InvertGenerator(ast.NodeTransformer):
 
         return None
 
-
     def visit_Expr(self, node):
-        
+
         newnode = node
 
         yieldValue = self.extractValueFromYieldExpr(node)
         if yieldValue is not None:
             newnode = self.coroutineSendExpression(
-                    self.target,
-                    yieldValue)
+                self.target,
+                yieldValue)
 
         self.generic_visit(newnode)
         return newnode
@@ -119,9 +126,9 @@ class RemoveDecorators(ast.NodeTransformer):
         node.decorator_list = []
         return node
 
-def transformAstWith(*args):
 
-    transformers = list(args)
+def transformAstWith(globalEnv, transformers):
+
     transformers.insert(0, RemoveDecorators)
 
     def transformDecorator(func):
@@ -132,7 +139,8 @@ def transformAstWith(*args):
 
         #print "BEFORE: "
         #print astpp.dump(node)
-        for transformer in  transformers:
+
+        for transformer in transformers:
             transformer().visit(node)
 
         #print "AFTER: "
@@ -141,12 +149,9 @@ def transformAstWith(*args):
         ast.fix_missing_locations(node)
         compiled = compile(node, '<string>', 'exec')
 
-        tempNamespace = {}
+        tempNamespace = copy.copy(globalEnv)
         exec compiled in tempNamespace
 
-        func.__code__ = tempNamespace[funcName].__code__
-
-        return func
+        return tempNamespace[funcName]
 
     return transformDecorator
-    
