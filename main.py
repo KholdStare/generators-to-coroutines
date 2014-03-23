@@ -63,7 +63,7 @@ if __name__ == "__main__":
 
     words = text.split()
 
-    predicate = lambda word: len(word) > 9
+    predicate = lambda word: len(word) > 8
 
     print "Generators:"
     for val in genPairs(genFilter(predicate, genPassthrough(words))):
