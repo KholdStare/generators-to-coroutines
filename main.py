@@ -13,6 +13,7 @@ def sourceFromIterable(iterable, target):
 
 @invertibleGenerator(globals())
 def genPairs(iterable):
+    """ Aggregate two consecutive values into pairs """
 
     buf = []
 
@@ -26,6 +27,7 @@ def genPairs(iterable):
 
 @invertibleGenerator(globals())
 def genFilter(predicate, iterable):
+    """ Filter based on predicate """
 
     for elem in iterable:
         if predicate(elem):
@@ -34,6 +36,8 @@ def genFilter(predicate, iterable):
 
 @invertibleGenerator(globals())
 def genPassthrough(iterable):
+    """ Pass values through without modification """
+
     for val in iterable:
         yield val
 
