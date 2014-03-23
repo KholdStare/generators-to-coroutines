@@ -1,19 +1,12 @@
 #!/usr/bin/env python
 
-import dis
+from codecorate import *
 
 ######
 # Coroutine stuff
 
-def coroutine(func):
-    def start(*args, **kwargs):
-        g = func(*args, **kwargs)
-        g.next()
-        return g
-    return start
-
 @coroutine
-def co_filter(target):
+def coFilter(target):
     buf = []
 
     while True:
@@ -39,28 +32,8 @@ def sourceFromIterable(iterable):
 #####
 # Gen stuff
 
-def generatorToCoroutine(func):
-
-    def start(target):
-
-        g = func(*args, **kwargs)
-        g.next()
-        return g
-    return start
-
-class CoGenWrapper(object):
-
-    class IterableProxy(object):
-
-        def __init__(self, parentWrapper):
-            pass
-
-
-    def __init__(self, target):
-        pass
-
-
-def gen_filter(iterable):
+@invertibleGenerator
+def genFilter(iterable):
     
     buf = []
 
@@ -78,25 +51,21 @@ def receiver():
         n = (yield)
         print("Got %s" % n)
 
+@invertibleGenerator
 def simpleGen(iterable):
     for val in iterable:
         yield val
 
+@coroutine
 def simpleCo(target):
     while True:
         val = (yield)
         target.send(val)
 
 if __name__ == "__main__":
-
-    print "Generator:"
-    dis.dis(simpleGen)
-    print "Coroutine:"
-    dis.dis(simpleCo)
-    print "Bigger Generator:"
-    dis.dis(gen_filter)
     
-    sourceFromIterable(xrange(0,9))(co_filter(
-                                    receiver()))
+    sourceFromIterable(xrange(0,9))(genFilter.co(
+                                    simpleGen.co(
+                                    receiver())))
 
 
