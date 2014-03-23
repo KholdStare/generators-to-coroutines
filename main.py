@@ -3,20 +3,13 @@
 from codecorate import (invertibleGenerator, coroutine)
 
 
-# is currying necessary?
-def sourceFromIterable(iterable):
+def sourceFromIterable(iterable, target):
 
-    def source(target):
-        for elem in iterable:
-            target.send(elem)
+    for elem in iterable:
+        target.send(elem)
 
-        target.close()
+    target.close()
 
-    return source
-
-
-#####
-# Gen stuff
 
 @invertibleGenerator(globals())
 def genPairs(iterable):
@@ -38,11 +31,11 @@ def genPassthrough(iterable):
 
 
 @coroutine
-def receiver():
-    print "Ready to receive"
+def coReceive():
     while True:
         val = (yield)
         print "Got %s" % str(val)
+
 
 if __name__ == "__main__":
 
@@ -51,6 +44,7 @@ if __name__ == "__main__":
         print "Got %s" % str(val)
 
     print "Coroutines:"
-    sourceFromIterable(xrange(0, 9))(genPairs.co(
-                                     genPassthrough.co(
-                                     receiver())))
+    sourceFromIterable(xrange(0, 9),
+                       genPairs.co(
+                       genPassthrough.co(
+                       coReceive())))

@@ -1,14 +1,7 @@
 import ast
 import inspect
-import astpp
+#import astpp
 import copy
-
-
-def viewAst(obj):
-    node = ast.parse(inspect.getsource(obj))
-    print astpp.dump(node)
-
-    return obj
 
 
 def coroutine(func):
