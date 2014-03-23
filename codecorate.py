@@ -17,8 +17,8 @@ def invertibleGenerator(globalEnv):
     coroutine. """
 
     def decorator(func):
-        func.co = coroutine(transformAstWith(
-            globalEnv, [InvertGenerator])(func)
+        func.co = coroutine(
+            transformAstWith(globalEnv, [InvertGenerator])(func)
         )
         return func
 
@@ -26,6 +26,9 @@ def invertibleGenerator(globalEnv):
 
 
 class InvertGenerator(ast.NodeTransformer):
+    """ Transform a function AST, from a generator into a coroutine (from pull
+    to push). The iterable parameter to the generator that was pulled from, now
+    becomes the "target" parameter of the coroutine that is pushed to."""
     # TODO: should probably be a two-pass procedure:
     # 1. Find what argument to turn from iterable to target
     # 2. Carry out transformations
@@ -47,6 +50,7 @@ class InvertGenerator(ast.NodeTransformer):
         return node
 
     def isForStatementCandidate(self, node):
+        """ Return True if For statement is a candidate for transformation """
 
         return self.functionArguments is not None and \
             isinstance(node.iter, ast.Name) and \
@@ -65,6 +69,7 @@ class InvertGenerator(ast.NodeTransformer):
             # save the iterable, which will be now used as a target instead.
             self.target = node.iter
 
+            # prepend statement to await a value in the coroutine
             newbody = [ast.Assign(targets=[node.target],
                                   value=ast.Yield(value=None))] + node.body
             newnode = ast.While(
@@ -77,6 +82,9 @@ class InvertGenerator(ast.NodeTransformer):
         return ast.copy_location(newnode, node)
 
     def coroutineSendExpression(self, target, exprToSend):
+        """ Create an expression like
+            target.send(exprToSend)
+        """
         return ast.Expr(value=ast.Call(
             func=ast.Attribute(
                 value=target,
@@ -121,13 +129,17 @@ class RemoveDecorators(ast.NodeTransformer):
 
 
 def transformAstWith(globalEnv, transformers):
+    """ Create a decorator that transforms functions in a given global
+    environment, using the provided NodeTransformer classes """
 
+    # Always remove decorators when transforming
+    # TODO: necessary?
     transformers.insert(0, RemoveDecorators)
 
     def transformDecorator(func):
         funcName = func.__name__
 
-        # TODO: need to unindent if method?
+        # TODO: need to unindent if method or local function
         node = ast.parse(inspect.getsource(func))
 
         #print "BEFORE: "
