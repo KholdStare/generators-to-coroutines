@@ -3,7 +3,7 @@
 from codecorate import (invertibleGenerator, coroutine)
 
 
-def sourceFromIterable(iterable, target):
+def pushFromIterable(iterable, target):
 
     for elem in iterable:
         target.send(elem)
@@ -70,9 +70,9 @@ if __name__ == "__main__":
         print "Got %s" % str(val)
 
     print "Coroutines:"
-    sourceFromIterable(words,
-                       genPassthrough.co(
-                       genFilter.co(predicate,
-                       genPairs.co(
-                       coReceive()
-                       ))))
+    pushFromIterable(words,
+                     genPassthrough.co(
+                     genFilter.co(predicate,
+                     genPairs.co(
+                     coReceive()
+                     ))))
