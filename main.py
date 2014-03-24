@@ -42,6 +42,28 @@ def genPassthrough(iterable):
         yield val
 
 
+@invertibleGenerator(globals())
+def genMap(func, iterable):
+    """ Map function on all values """
+
+    for val in iterable:
+        yield func(val)
+
+
+@coroutine
+def coSplit(predicate, trueTarget, falseTarget):
+
+    while True:
+        val = (yield)
+        if predicate(val):
+            trueTarget.send(val)
+        else:
+            falseTarget.send(val)
+
+    trueTarget.close()
+    falseTarget.close()
+
+
 @coroutine
 def coReceive():
     while True:
@@ -66,13 +88,18 @@ if __name__ == "__main__":
     predicate = lambda word: len(word) > 8
 
     print "Generators:"
-    for val in genPairs(genFilter(predicate, genPassthrough(words))):
+    generatorPipeline = lambda words: genPairs(
+        genMap(str.upper, genFilter(predicate, genPassthrough(words)))
+    )
+
+    for val in generatorPipeline(words):
         print "Got %s" % str(val)
 
     print "Coroutines:"
-    pushFromIterable(words,
-                     genPassthrough.co(
-                     genFilter.co(predicate,
-                     genPairs.co(
-                     coReceive()
-                     ))))
+    coroutinePipeline = genPassthrough.co(
+        genFilter.co(predicate,
+        genMap.co(str.upper,
+        genPairs.co(
+        coReceive()
+        ))))
+    pushFromIterable(words, coroutinePipeline)
