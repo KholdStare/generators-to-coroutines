@@ -1,7 +1,14 @@
 import ast
 import inspect
-#import astpp
+import astpp
 import copy
+
+
+def viewAst(obj):
+    node = ast.parse(inspect.getsource(obj))
+    print astpp.dump(node)
+
+    return obj
 
 
 def coroutine(func):
@@ -25,6 +32,72 @@ def invertibleGenerator(globalEnv):
     return decorator
 
 
+class AnalyzeGeneratorFunction(ast.NodeVisitor):
+
+    def __init__(self):
+        self.loadedNames = set()
+        # store statements that come after loops
+        self.loopContexts = []
+        self.functionArguments = None
+        self.target = None
+
+    def visit(self, node):
+        try:
+            substatements = node.body
+            for i, subnode in enumerate(substatements):
+                if isinstance(subnode, ast.For):
+                    self.loopContexts.append((subnode, substatements[i+1:]))
+        except AttributeError:
+            pass
+
+        super(AnalyzeGeneratorFunction, self).visit(node)
+
+    def visit_FunctionDef(self, node):
+        """ Gather function arguments for use later. """
+        if self.functionArguments is None:
+            self.functionArguments = node.args.args
+
+        self.generic_visit(node)
+
+    def isForStatementCandidate(self, node):
+        """ Return True if For statement is a candidate for transformation """
+
+        return self.functionArguments is not None and \
+            isinstance(node.iter, ast.Name) and \
+            node.iter.id in (arg.id for arg in self.functionArguments)
+
+    def visit_For(self, node):
+        """ Change iteration into while-yield statements """
+
+        if self.isForStatementCandidate(node):
+            if self.target is not None:
+                # TODO: raise exception!!!
+                pass
+            else:
+                # save the iterable, which will be now used as a target
+                # instead.
+                self.target = node.iter
+
+        self.generic_visit(node)
+
+    def visit_Name(self, node):
+
+        if isinstance(node.ctx, ast.Load):
+            self.loadedNames.add(node.id)
+
+        self.generic_visit(node)
+
+    def __str__(self):
+        return "names = {}\n"\
+               "loopContexts = {}\n"\
+               "functionArgs = {}\n"\
+               "target = {}".format(
+                   self.loadedNames,
+                   map(lambda (n, l): (astpp.dump(n), l), self.loopContexts),
+                   map(astpp.dump, self.functionArguments),
+                   astpp.dump(self.target))
+
+
 class InvertGenerator(ast.NodeTransformer):
     """ Transform a function AST, from a generator into a coroutine (from pull
     to push). The iterable parameter to the generator that was pulled from, now
@@ -39,6 +112,17 @@ class InvertGenerator(ast.NodeTransformer):
     def __init__(self):
         self.functionArguments = None
         self.iterable = None
+        self.target = None
+        self.analysis = None
+
+    def visit(self, node):
+
+        if self.analysis is None:
+            self.analysis = AnalyzeGeneratorFunction()
+            self.analysis.visit(node)
+            print self.analysis
+
+        return super(InvertGenerator, self).visit(node)
 
     def visit_FunctionDef(self, node):
         """ Gather function arguments for use later. """
@@ -62,6 +146,9 @@ class InvertGenerator(ast.NodeTransformer):
         # TODO: take care of StopIteration conversion?
 
         newnode = node
+
+        # TODO: fix this check to be more careful
+        #if node.iter.id == self.analysis.target.id:
         if self.isForStatementCandidate(node):
             # For(expr target, expr iter, stmt* body, stmt* orelse)
             # While(expr test, stmt* body, stmt* orelse)
@@ -95,6 +182,17 @@ class InvertGenerator(ast.NodeTransformer):
             starargs=None,
             kwargs=None
             ))
+
+    def tryExceptGeneratorExit(self, tryBody, exceptBody):
+        return ast.TryExcept(
+            body=tryBody,
+            handlers=[
+                ast.ExceptHandler(
+                    type=ast.Name(id='GeneratorExit', ctx=ast.Load()),
+                    name=None,
+                    body=exceptBody),
+            ],
+            orelse=[])
 
     def extractValueFromYieldExpr(self, expr):
 
