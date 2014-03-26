@@ -2,7 +2,7 @@
 
 import unittest
 import main
-from codecorate import invertibleGenerator
+from codecorate import invertibleGenerator, coroutine, viewAst
 from nose.tools import assert_equal
 from nose_parameterized import parameterized
 
@@ -14,6 +14,19 @@ def genAfterLoop(iterable):
         yield val
 
     yield 42
+
+
+@coroutine
+@viewAst
+def coAfterLoop(target):
+
+    try:
+        while True:
+            val = (yield)
+            target.send(val)
+    except GeneratorExit:
+        target.send(42)
+        target.close()
 
 
 class DummyCoroutine(object):
@@ -88,3 +101,9 @@ class TestEquivalence(unittest.TestCase):
         assertEqualPipelines(
             genAfterLoop,
             genAfterLoop.co, l)
+
+    @parameterized.expand(testParameters)
+    def test_after_loop_manual(self, _, l):
+        assertEqualPipelines(
+            genAfterLoop,
+            coAfterLoop, l)

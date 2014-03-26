@@ -37,20 +37,9 @@ class AnalyzeGeneratorFunction(ast.NodeVisitor):
     def __init__(self):
         self.loadedNames = set()
         # store statements that come after loops
-        self.loopContexts = []
+        self.loopsToBeConverted = set()
         self.functionArguments = None
         self.target = None
-
-    def visit(self, node):
-        try:
-            substatements = node.body
-            for i, subnode in enumerate(substatements):
-                if isinstance(subnode, ast.For):
-                    self.loopContexts.append((subnode, substatements[i+1:]))
-        except AttributeError:
-            pass
-
-        super(AnalyzeGeneratorFunction, self).visit(node)
 
     def visit_FunctionDef(self, node):
         """ Gather function arguments for use later. """
@@ -70,6 +59,7 @@ class AnalyzeGeneratorFunction(ast.NodeVisitor):
         """ Change iteration into while-yield statements """
 
         if self.isForStatementCandidate(node):
+            self.loopsToBeConverted.add(node)
             if self.target is not None:
                 # TODO: raise exception!!!
                 pass
@@ -89,11 +79,11 @@ class AnalyzeGeneratorFunction(ast.NodeVisitor):
 
     def __str__(self):
         return "names = {}\n"\
-               "loopContexts = {}\n"\
+               "loopsToBeConverted = {}\n"\
                "functionArgs = {}\n"\
                "target = {}".format(
                    self.loadedNames,
-                   map(lambda (n, l): (astpp.dump(n), l), self.loopContexts),
+                   self.loopsToBeConverted,
                    map(astpp.dump, self.functionArguments),
                    astpp.dump(self.target))
 
@@ -102,59 +92,70 @@ class InvertGenerator(ast.NodeTransformer):
     """ Transform a function AST, from a generator into a coroutine (from pull
     to push). The iterable parameter to the generator that was pulled from, now
     becomes the "target" parameter of the coroutine that is pushed to."""
-    # TODO: should probably be a two-pass procedure:
-    # 1. Find what argument to turn from iterable to target
-    # 2. Carry out transformations
-    #
-    # This needs to be done, if first yield is before first use of iterable,
-    # in which case this code won't know how to conver the yield statement
 
     def __init__(self):
-        self.functionArguments = None
-        self.iterable = None
-        self.target = None
         self.analysis = None
+        self.loopsToBeWrapped = None
+
+    def tryExceptGeneratorExit(self, tryBody, exceptBody):
+        """ Create a try-except wrapper around two bodies of statements. """
+        return ast.TryExcept(
+            body=tryBody,
+            handlers=[
+                ast.ExceptHandler(
+                    type=ast.Name(id='GeneratorExit', ctx=ast.Load()),
+                    name=None,
+                    body=exceptBody),
+            ],
+            orelse=[])
 
     def visit(self, node):
 
+        # perform analysis on whole AST as a first phase
+        # (only called once)
         if self.analysis is None:
             self.analysis = AnalyzeGeneratorFunction()
             self.analysis.visit(node)
+            self.loopsToBeWrapped = copy.copy(self.analysis.loopsToBeConverted)
             print self.analysis
+
+        # TODO: Make this a function
+        # Every appropriate For loop over iterable, gets wrapped with a
+        # try-except for GeneratorExit, since the For loop will be transformed
+        # into an infinite While loop.
+        try:
+            # TODO: other attributes may contain bodies of statements,
+            # e.g. orelse?
+            substatements = node.body
+            replacementBody = None
+            for i, subnode in enumerate(substatements):
+                if subnode in self.loopsToBeWrapped:
+                    replacementBody = substatements[0:i] + [
+                        ast.copy_location(
+                            self.tryExceptGeneratorExit(
+                                [subnode],
+                                substatements[i+1:]),
+                            subnode)
+                    ]
+                    self.loopsToBeWrapped.remove(subnode)
+                    break
+
+            if replacementBody is not None:
+                node.body = replacementBody
+        except AttributeError:
+            pass
 
         return super(InvertGenerator, self).visit(node)
 
-    def visit_FunctionDef(self, node):
-        """ Gather function arguments for use later. """
-        if self.functionArguments is None:
-            self.functionArguments = node.args.args
-
-        self.generic_visit(node)
-
-        return node
-
-    def isForStatementCandidate(self, node):
-        """ Return True if For statement is a candidate for transformation """
-
-        return self.functionArguments is not None and \
-            isinstance(node.iter, ast.Name) and \
-            node.iter.id in (arg.id for arg in self.functionArguments)
-
     def visit_For(self, node):
         """ Change iteration into while-yield statements """
-        # TODO: take care of GeneratorExit handling.
         # TODO: take care of StopIteration conversion?
 
         newnode = node
 
-        # TODO: fix this check to be more careful
-        #if node.iter.id == self.analysis.target.id:
-        if self.isForStatementCandidate(node):
+        if node in self.analysis.loopsToBeConverted:
             # For(expr target, expr iter, stmt* body, stmt* orelse)
             # While(expr test, stmt* body, stmt* orelse)
-
-            # save the iterable, which will be now used as a target instead.
-            self.target = node.iter
 
             # prepend statement to await a value in the coroutine
             newbody = [ast.Assign(targets=[node.target],
@@ -183,17 +184,6 @@ class InvertGenerator(ast.NodeTransformer):
             kwargs=None
             ))
 
-    def tryExceptGeneratorExit(self, tryBody, exceptBody):
-        return ast.TryExcept(
-            body=tryBody,
-            handlers=[
-                ast.ExceptHandler(
-                    type=ast.Name(id='GeneratorExit', ctx=ast.Load()),
-                    name=None,
-                    body=exceptBody),
-            ],
-            orelse=[])
-
     def extractValueFromYieldExpr(self, expr):
 
         if isinstance(expr.value, ast.Yield):
@@ -208,7 +198,7 @@ class InvertGenerator(ast.NodeTransformer):
         yieldValue = self.extractValueFromYieldExpr(node)
         if yieldValue is not None:
             newnode = self.coroutineSendExpression(
-                self.target,
+                self.analysis.target,
                 yieldValue)
 
         self.generic_visit(newnode)
@@ -240,14 +230,14 @@ def transformAstWith(globalEnv, transformers):
         # TODO: need to unindent if method or local function
         node = ast.parse(inspect.getsource(func))
 
-        #print "BEFORE: "
-        #print astpp.dump(node)
+        print "BEFORE: "
+        print astpp.dump(node)
 
         for transformer in transformers:
-            transformer().visit(node)
+            node = transformer().visit(node)
 
-        #print "AFTER: "
-        #print astpp.dump(node)
+        print "AFTER: "
+        print astpp.dump(node)
 
         ast.fix_missing_locations(node)
         compiled = compile(node, '<string>', 'exec')

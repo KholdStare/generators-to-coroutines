@@ -2,4 +2,4 @@
 
 export PYTHONPATH=$(pwd)
 
-nosetests -v ./tests/runtests.py
+nosetests -s -v ./tests/runtests.py
