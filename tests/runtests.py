@@ -2,7 +2,8 @@
 
 import unittest
 import main
-from codecorate import invertibleGenerator, coroutine, viewAst
+from codecorate import invertibleGenerator
+from codecorate import coroutine, viewAst
 from nose.tools import assert_equal
 from nose_parameterized import parameterized
 
@@ -16,17 +17,62 @@ def genAfterLoop(iterable):
     yield 42
 
 
+@invertibleGenerator(globals())
+def genBeforeLoop(iterable):
+
+    yield 42
+
+    for val in iterable:
+        yield val
+
+
+@invertibleGenerator(globals())
+def genTwoLoops(iterable):
+
+    for val in iterable:
+        if val == "break":
+            yield "break from first"
+            break
+        yield "first: " + str(val)
+
+    yield "between loops"
+
+    for val in iterable:
+        if val == "break":
+            yield "break from second"
+            break
+        yield "second " + str(val)
+
+    yield "done"
+
+
 @coroutine
-@viewAst
-def coAfterLoop(target):
+def coTwoLoops(target):
+    notDone = True
 
     try:
-        while True:
+        while notDone:
             val = (yield)
-            target.send(val)
+            if val == "break":
+                target.send("break from first")
+                break
+            target.send("first: " + str(val))
     except GeneratorExit:
-        target.send(42)
-        target.close()
+        notDone = False
+
+    target.send("between loops")
+
+    try:
+        while notDone:
+            val = (yield)
+            if val == "break":
+                target.send("break from second")
+                break
+            target.send("second " + str(val))
+    except GeneratorExit:
+        notDone = False
+
+    target.send("done")
 
 
 class DummyCoroutine(object):
@@ -56,15 +102,15 @@ def runCoroutinePipeline(pipeline, iterable):
 
 
 def runGeneratorPipeline(pipeline, iterable):
-
-    return [val for val in pipeline(iterable)]
+    results = [val for val in pipeline(iterable)]
+    return results
 
 
 def assertEqualPipelines(genPipeline, coPipeline, iterable):
 
     cachedIterable = list(iterable)
-    assert_equal(runCoroutinePipeline(coPipeline, cachedIterable),
-                 runGeneratorPipeline(genPipeline, cachedIterable))
+    assert_equal(runGeneratorPipeline(genPipeline, cachedIterable.__iter__()),
+                 runCoroutinePipeline(coPipeline, cachedIterable))
 
 
 class TestEquivalence(unittest.TestCase):
@@ -103,7 +149,22 @@ class TestEquivalence(unittest.TestCase):
             genAfterLoop.co, l)
 
     @parameterized.expand(testParameters)
-    def test_after_loop_manual(self, _, l):
+    def test_before_loop(self, _, l):
         assertEqualPipelines(
-            genAfterLoop,
-            coAfterLoop, l)
+            genBeforeLoop,
+            genBeforeLoop.co, l)
+
+    @parameterized.expand(
+        testParameters + [
+            ("one break", ["break"]),
+            ("val + one break", [1, "break"]),
+            ("vals + one break", [1, 2, "break"]),
+            ("one break + val", ["break", 1]),
+            ("one break + vals", ["break", 1, 2]),
+            ("two breaks", ["break", "break"])
+        ])
+    def test_two_loops(self, _, l):
+        assertEqualPipelines(
+            genTwoLoops,
+            coTwoLoops, l)
+            #genTwoLoops.co, l)
