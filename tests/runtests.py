@@ -161,10 +161,13 @@ class TestEquivalence(unittest.TestCase):
             ("vals + one break", [1, 2, "break"]),
             ("one break + val", ["break", 1]),
             ("one break + vals", ["break", 1, 2]),
-            ("two breaks", ["break", "break"])
+            ("two breaks", ["break", "break"]),
+            ("vals + two breaks", [1, 2, "break", "break"]),
+            ("two breaks + vals", ["break", "break", 1, 2]),
+            ("break + vals + break", ["break", 1, 2, "break"]),
+            ("vals + two break + vals", [1, 2, "break", 3, 4, "break", 5, 6]),
         ])
     def test_two_loops(self, _, l):
         assertEqualPipelines(
             genTwoLoops,
-            coTwoLoops, l)
-            #genTwoLoops.co, l)
+            genTwoLoops.co, l)

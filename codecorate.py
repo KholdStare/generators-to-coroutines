@@ -2,6 +2,7 @@ import ast
 import inspect
 import astpp
 import copy
+import random
 
 
 def viewAst(obj):
@@ -61,7 +62,7 @@ class AnalyzeGeneratorFunction(ast.NodeVisitor):
         if self.isForStatementCandidate(node):
             self.loopsToBeConverted.add(node)
             if self.target is not None:
-                # TODO: raise exception!!!
+                # TODO: raise exception if different target!
                 pass
             else:
                 # save the iterable, which will be now used as a target
@@ -97,7 +98,7 @@ class InvertGenerator(ast.NodeTransformer):
         self.analysis = None
         self.loopsToBeWrapped = None
 
-    def tryExceptGeneratorExit(self, tryBody, exceptBody):
+    def _tryExceptGeneratorExit(self, tryBody, exceptBody):
         """ Create a try-except wrapper around two bodies of statements. """
         return ast.TryExcept(
             body=tryBody,
@@ -109,6 +110,15 @@ class InvertGenerator(ast.NodeTransformer):
             ],
             orelse=[])
 
+    def _moreValuesAvailableAssignmentNode(self, loadId):
+        return ast.Assign(
+            targets=[ast.Name(id=self.moreValuesAvailableId, ctx=ast.Store())],
+            value=ast.Name(id=loadId, ctx=ast.Load()))
+
+    def visit_FunctionDef(self, node):
+        node.body.insert(0, self._moreValuesAvailableAssignmentNode('True'))
+        return self.generic_visit(node)
+
     def visit(self, node):
 
         # perform analysis on whole AST as a first phase
@@ -118,31 +128,9 @@ class InvertGenerator(ast.NodeTransformer):
             self.analysis.visit(node)
             self.loopsToBeWrapped = copy.copy(self.analysis.loopsToBeConverted)
 
-        # TODO: Make this a function
-        # Every appropriate For loop over iterable, gets wrapped with a
-        # try-except for GeneratorExit, since the For loop will be transformed
-        # into an infinite While loop.
-        try:
-            # TODO: other attributes may contain bodies of statements,
-            # e.g. orelse?
-            substatements = node.body
-            replacementBody = None
-            for i, subnode in enumerate(substatements):
-                if subnode in self.loopsToBeWrapped:
-                    replacementBody = substatements[0:i] + [
-                        ast.copy_location(
-                            self.tryExceptGeneratorExit(
-                                [subnode],
-                                substatements[i+1:]),
-                            subnode)
-                    ]
-                    self.loopsToBeWrapped.remove(subnode)
-                    break
-
-            if replacementBody is not None:
-                node.body = replacementBody
-        except AttributeError:
-            pass
+            self.moreValuesAvailableId = "moreValuesAvailable"
+            while self.moreValuesAvailableId in self.analysis.loadedNames:
+                self.moreValuesAvailableId += str(random.randint(0, 1000000))
 
         return super(InvertGenerator, self).visit(node)
 
@@ -159,16 +147,20 @@ class InvertGenerator(ast.NodeTransformer):
             # prepend statement to await a value in the coroutine
             newbody = [ast.Assign(targets=[node.target],
                                   value=ast.Yield(value=None))] + node.body
-            newnode = ast.While(
-                test=ast.Name(id='True', ctx=ast.Load()),
+            whileNode = ast.While(
+                test=ast.Name(id=self.moreValuesAvailableId, ctx=ast.Load()),
                 body=newbody,
                 orelse=[])  # TODO: what to do with orelse
+
+            newnode = self._tryExceptGeneratorExit(
+                [whileNode],
+                [self._moreValuesAvailableAssignmentNode('False')])
 
         self.generic_visit(newnode)
 
         return ast.copy_location(newnode, node)
 
-    def coroutineSendExpression(self, target, exprToSend):
+    def _coroutineSendExpression(self, target, exprToSend):
         """ Create an expression like
             target.send(exprToSend)
         """
@@ -183,7 +175,7 @@ class InvertGenerator(ast.NodeTransformer):
             kwargs=None
             ))
 
-    def extractValueFromYieldExpr(self, expr):
+    def _extractValueFromYieldExpr(self, expr):
 
         if isinstance(expr.value, ast.Yield):
             return expr.value.value
@@ -194,9 +186,9 @@ class InvertGenerator(ast.NodeTransformer):
 
         newnode = node
 
-        yieldValue = self.extractValueFromYieldExpr(node)
+        yieldValue = self._extractValueFromYieldExpr(node)
         if yieldValue is not None:
-            newnode = self.coroutineSendExpression(
+            newnode = self._coroutineSendExpression(
                 self.analysis.target,
                 yieldValue)
 
