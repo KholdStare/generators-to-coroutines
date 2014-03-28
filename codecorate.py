@@ -117,7 +117,6 @@ class InvertGenerator(ast.NodeTransformer):
             self.analysis = AnalyzeGeneratorFunction()
             self.analysis.visit(node)
             self.loopsToBeWrapped = copy.copy(self.analysis.loopsToBeConverted)
-            print self.analysis
 
         # TODO: Make this a function
         # Every appropriate For loop over iterable, gets wrapped with a
@@ -230,14 +229,14 @@ def transformAstWith(globalEnv, transformers):
         # TODO: need to unindent if method or local function
         node = ast.parse(inspect.getsource(func))
 
-        print "BEFORE: "
-        print astpp.dump(node)
+        #print "BEFORE: "
+        #print astpp.dump(node)
 
         for transformer in transformers:
             node = transformer().visit(node)
 
-        print "AFTER: "
-        print astpp.dump(node)
+        #print "AFTER: "
+        #print astpp.dump(node)
 
         ast.fix_missing_locations(node)
         compiled = compile(node, '<string>', 'exec')
