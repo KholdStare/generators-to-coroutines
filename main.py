@@ -1,14 +1,17 @@
 #!/usr/bin/env python
 
-from codecorate import (invertibleGenerator, coroutine)
+from codecorate import invertibleGenerator, coroutine
 
 
 def pushFromIterable(iterable, target):
 
-    for elem in iterable:
-        target.send(elem)
+    try:
+        for elem in iterable:
+            target.send(elem)
 
-    target.close()
+        target.close()
+    except StopIteration:
+        pass
 
 
 @invertibleGenerator(globals())
