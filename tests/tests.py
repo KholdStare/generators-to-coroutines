@@ -1,5 +1,3 @@
-#!/usr/bin/env python
-
 import unittest
 import main
 from codecorate import invertibleGenerator
