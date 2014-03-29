@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 
-from codecorate import invertibleGenerator, coroutine
+from decorators import invertibleGenerator, coroutine
 
 
 def pushFromIterable(iterable, target):
