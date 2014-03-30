@@ -1,6 +1,21 @@
 import ast
 import inspect
 import copy
+import six
+import random
+
+
+if six.PY3:
+    _TryNode = ast.Try
+
+    def getFunctionArgumentIdentifiers(node):
+        return [arg.arg for arg in node.args.args]
+
+else:
+    _TryNode = ast.TryExcept
+
+    def getFunctionArgumentIdentifiers(node):
+        return [arg.id for arg in node.args.args]
 
 
 class AnalyzeGeneratorFunction(ast.NodeVisitor):
@@ -9,22 +24,22 @@ class AnalyzeGeneratorFunction(ast.NodeVisitor):
         self.loadedNames = set()
         # store statements that come after loops
         self.loopsToBeConverted = set()
-        self.functionArguments = None
+        self.functionArgumentIds = None
         self.target = None
 
     def visit_FunctionDef(self, node):
         """ Gather function arguments for use later. """
-        if self.functionArguments is None:
-            self.functionArguments = node.args.args
+        if self.functionArgumentIds is None:
+            self.functionArgumentIds = getFunctionArgumentIdentifiers(node)
 
         self.generic_visit(node)
 
     def isForStatementCandidate(self, node):
         """ Return True if For statement is a candidate for transformation """
 
-        return self.functionArguments is not None and \
+        return self.functionArgumentIds is not None and \
             isinstance(node.iter, ast.Name) and \
-            node.iter.id in (arg.id for arg in self.functionArguments)
+            node.iter.id in self.functionArgumentIds
 
     def visit_For(self, node):
         """ Change iteration into while-yield statements """
@@ -60,7 +75,7 @@ class InvertGenerator(ast.NodeTransformer):
 
     def _tryExceptGeneratorExit(self, tryBody, exceptBody):
         """ Create a try-except wrapper around two bodies of statements. """
-        return ast.TryExcept(
+        return _TryNode(
             body=tryBody,
             handlers=[
                 ast.ExceptHandler(
@@ -68,7 +83,8 @@ class InvertGenerator(ast.NodeTransformer):
                     name=None,
                     body=exceptBody),
             ],
-            orelse=[])
+            orelse=[],
+            finalbody=[])
 
     def _moreValuesAvailableAssignmentNode(self, loadId):
         return ast.Assign(
@@ -194,7 +210,7 @@ def transformAstWith(globalEnv, transformers):
         compiled = compile(node, '<string>', 'exec')
 
         tempNamespace = copy.copy(globalEnv)
-        exec compiled in tempNamespace
+        six.exec_(compiled, tempNamespace)
 
         return tempNamespace[funcName]
 

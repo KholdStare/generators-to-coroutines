@@ -71,7 +71,7 @@ def coSplit(predicate, trueTarget, falseTarget):
 def coReceive():
     while True:
         val = (yield)
-        print "Got %s" % str(val)
+        print("Got %s" % str(val))
 
 
 if __name__ == "__main__":
@@ -90,15 +90,15 @@ if __name__ == "__main__":
 
     predicate = lambda word: len(word) > 8
 
-    print "Generators:"
+    print("Generators:")
     generatorPipeline = lambda words: genPairs(
         genMap(str.upper, genFilter(predicate, genPassthrough(words)))
     )
 
     for val in generatorPipeline(words):
-        print "Got %s" % str(val)
+        print("Got %s" % str(val))
 
-    print "Coroutines:"
+    print("Coroutines:")
     coroutinePipeline = genPassthrough.co(
         genFilter.co(predicate,
         genMap.co(str.upper,

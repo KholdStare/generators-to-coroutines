@@ -1,10 +1,11 @@
 from ast_transformers import InvertGenerator, transformAstWith
+import six
 
 
 def coroutine(func):
     def start(*args, **kwargs):
         g = func(*args, **kwargs)
-        g.next()
+        six.next(g)
         return g
     return start
 
