@@ -1,6 +1,6 @@
 import unittest
-import examples
-from decorators import invertibleGenerator, coroutine
+from . import examples
+from .decorators import invertibleGenerator, coroutine
 from nose.tools import assert_equal
 from nose_parameterized import parameterized
 

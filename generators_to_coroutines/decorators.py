@@ -1,4 +1,4 @@
-from ast_transformers import InvertGenerator, transformAstWith
+from .ast_transformers import InvertGenerator, transformAstWith
 import six
 
 
