@@ -3,17 +3,18 @@ import inspect
 import copy
 import six
 import random
+import sys
 
 
-if six.PY3:
+if sys.version_info[0] == 3 and sys.version_info[1] > 2:
     _TryNode = ast.Try
-
-    def getFunctionArgumentIdentifiers(node):
-        return [arg.arg for arg in node.args.args]
-
 else:
     _TryNode = ast.TryExcept
 
+if six.PY3:
+    def getFunctionArgumentIdentifiers(node):
+        return [arg.arg for arg in node.args.args]
+else:
     def getFunctionArgumentIdentifiers(node):
         return [arg.id for arg in node.args.args]
 
