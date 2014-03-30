@@ -1,14 +1,4 @@
-import ast
-import inspect
-import astpp
 from ast_transformers import InvertGenerator, transformAstWith
-
-
-def viewAst(obj):
-    node = ast.parse(inspect.getsource(obj))
-    print astpp.dump(node)
-
-    return obj
 
 
 def coroutine(func):
