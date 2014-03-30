@@ -9,4 +9,4 @@ install:
     - "pip install -r requirements_test.txt"
 script:
     - nosetests
-    - ./generators_to_coroutines/examples.py
+    - python -m generators_to_coroutines.examples
