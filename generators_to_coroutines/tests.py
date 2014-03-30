@@ -5,7 +5,7 @@ from nose.tools import assert_equal
 from nose_parameterized import parameterized
 
 
-@invertibleGenerator(globals())
+@invertibleGenerator
 def genAfterLoop(iterable):
 
     for val in iterable:
@@ -14,7 +14,7 @@ def genAfterLoop(iterable):
     yield 42
 
 
-@invertibleGenerator(globals())
+@invertibleGenerator
 def genBeforeLoop(iterable):
 
     yield 42
@@ -23,7 +23,7 @@ def genBeforeLoop(iterable):
         yield val
 
 
-@invertibleGenerator(globals())
+@invertibleGenerator
 def genTwoLoops(iterable):
 
     for val in iterable:

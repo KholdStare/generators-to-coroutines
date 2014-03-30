@@ -1,5 +1,6 @@
 from .ast_transformers import InvertGenerator, transformAstWith
 import six
+import inspect
 
 
 def coroutine(func):
@@ -10,14 +11,13 @@ def coroutine(func):
     return start
 
 
-def invertibleGenerator(globalEnv):
+def invertibleGenerator(func):
     """ Add a co method to a generator function, that is the equivalent
     coroutine. """
 
-    def decorator(func):
-        func.co = coroutine(
-            transformAstWith(globalEnv, [InvertGenerator])(func)
-        )
-        return func
+    globalEnv = inspect.stack()[1][0].f_globals
 
-    return decorator
+    func.co = coroutine(
+        transformAstWith(globalEnv, [InvertGenerator])(func)
+    )
+    return func

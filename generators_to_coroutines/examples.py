@@ -14,7 +14,7 @@ def pushFromIterable(iterable, target):
         pass
 
 
-@invertibleGenerator(globals())
+@invertibleGenerator
 def genPairs(iterable):
     """ Aggregate two consecutive values into pairs """
 
@@ -28,7 +28,7 @@ def genPairs(iterable):
             buf = []
 
 
-@invertibleGenerator(globals())
+@invertibleGenerator
 def genFilter(predicate, iterable):
     """ Filter based on predicate """
 
@@ -37,7 +37,7 @@ def genFilter(predicate, iterable):
             yield elem
 
 
-@invertibleGenerator(globals())
+@invertibleGenerator
 def genPassthrough(iterable):
     """ Pass values through without modification """
 
@@ -45,7 +45,7 @@ def genPassthrough(iterable):
         yield val
 
 
-@invertibleGenerator(globals())
+@invertibleGenerator
 def genMap(func, iterable):
     """ Map function on all values """
 
