@@ -3,9 +3,10 @@ python:
     - 2.6
     - 2.7
     - pypy
-    - 3.2
     - 3.3
 install:
     - "pip install ."
     - "pip install -r requirements_test.txt"
-script: nosetests
+script:
+    - nosetests
+    - ./generators_to_coroutines/examples.py
