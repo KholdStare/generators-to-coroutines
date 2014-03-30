@@ -48,16 +48,6 @@ class AnalyzeGeneratorFunction(ast.NodeVisitor):
 
         self.generic_visit(node)
 
-    def __str__(self):
-        return "names = {}\n"\
-               "loopsToBeConverted = {}\n"\
-               "functionArgs = {}\n"\
-               "target = {}".format(
-                   self.loadedNames,
-                   self.loopsToBeConverted,
-                   map(astpp.dump, self.functionArguments),
-                   astpp.dump(self.target))
-
 
 class InvertGenerator(ast.NodeTransformer):
     """ Transform a function AST, from a generator into a coroutine (from pull
