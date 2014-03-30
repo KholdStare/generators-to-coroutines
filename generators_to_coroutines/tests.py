@@ -1,5 +1,5 @@
 import unittest
-from . import examples
+from . import tools
 from .decorators import invertibleGenerator, coroutine
 from nose.tools import assert_equal
 from nose_parameterized import parameterized
@@ -93,7 +93,7 @@ class DummyCoroutine(object):
 def runCoroutinePipeline(pipeline, iterable):
 
     dummy = DummyCoroutine()
-    examples.pushFromIterable(iterable, pipeline(dummy))
+    tools.pushFromIterable(iterable, pipeline(dummy))
 
     return dummy.results
 
@@ -122,21 +122,21 @@ class TestEquivalence(unittest.TestCase):
     @parameterized.expand(testParameters)
     def test_passthrough(self, _, l):
         assertEqualPipelines(
-            examples.genPassthrough, examples.genPassthrough.co, l)
+            tools.genPassthrough, tools.genPassthrough.co, l)
 
     @parameterized.expand(testParameters)
     def test_pair(self, _, l):
         assertEqualPipelines(
-            examples.genPairs,
-            examples.genPairs.co, l)
+            tools.genPairs,
+            tools.genPairs.co, l)
 
     @parameterized.expand(testParameters)
     def test_filter(self, _, l):
         iseven = lambda x: x % 2 == 0
 
         assertEqualPipelines(
-            lambda i: examples.genFilter(iseven, i),
-            lambda i: examples.genFilter.co(iseven, i),
+            lambda i: tools.genFilter(iseven, i),
+            lambda i: tools.genFilter.co(iseven, i),
             l)
 
     @parameterized.expand(testParameters)
