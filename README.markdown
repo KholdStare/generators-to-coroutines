@@ -1,9 +1,11 @@
 # Turn your generators into coroutines!
 
 [![Build Status](https://travis-ci.org/KholdStare/generators-to-coroutines.svg?branch=master)](https://travis-ci.org/KholdStare/generators-to-coroutines)
+[![PyPI version](https://badge.fury.io/py/generators-to-coroutines.png)](http://badge.fury.io/py/generators-to-coroutines)
 
 ## TL;DR
 
+* `pip install generators-to-coroutines`
 * Use the `invertibleGenerator` decorator, to automatically create an
   equivalent push-based coroutine from a pull-based generator.
 * Access this coroutine through the `co` member.
