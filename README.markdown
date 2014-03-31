@@ -9,6 +9,8 @@
 * Access this coroutine through the `co` member.
 * Reuse all your existing generators in [coroutine pipelines][cocourse].
 * Use with python 2.6, 2.7, 3.2, 3.3, or pypy.
+* The `iterable` parameter to the generator that was pulled from, now becomes the
+  `target` parameter of the coroutine that is pushed to.
 
 ```
 from generators_to_coroutines import invertibleGenerator
@@ -34,21 +36,20 @@ support for generators and the `itertools` module make building functional
 data-processing pipelines a breeze.
 
     def genFilter(predicate, iterable):
-        """ Filter based on predicate """
+        """ Filter based on predicate. Equivalent to ifilter in itertools """
 
         for elem in iterable:
             if predicate(elem):
                 yield elem
 
 Pull-based (iterator) pipelines are great for linear sequences of
-transformations. However, when a stream of data needs to be processed in
+transformations. However, when a stream of data/events needs to be processed in
 several different ways, there is no easy way to split a pull-based pipeline,
 without going over an iterable more than once.
 
 An excellent solution to this problem are [push-based pipelines that use
-coroutines][cocourse]. An equivalent filter coroutine
-that can be integrated into such a pipeline looks very similar to the
-generator:
+coroutines][cocourse]. An equivalent filter coroutine that can be integrated
+into such a pipeline looks very similar to the generator:
 
     @coroutine
     def coFilter(predicate, target):
@@ -59,7 +60,7 @@ generator:
             if predicate(elem):
                 target.send(elem)
 
-It would be a shame to have to rewrite all your existing generator to
+It would be a shame to have to rewrite all your existing generators to
 equivalent coroutines...  Luckily the transformation is fairly mechanical, and
 can be done by manipulating the AST of the generator, with the
 `invertibleGenerator` decorator!
