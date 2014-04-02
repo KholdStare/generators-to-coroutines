@@ -11,3 +11,7 @@ install:
 script:
     - nosetests
     - python -m generators_to_coroutines.examples
+branches:
+  only:
+    - master
+    - dev
