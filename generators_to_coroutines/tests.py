@@ -5,6 +5,24 @@ from nose.tools import assert_equal
 from nose_parameterized import parameterized
 
 
+exampleGlobal = 42
+
+
+def really():
+    def deeply():
+
+        @invertibleGenerator
+        def nestedFunction(iterable):
+            yield exampleGlobal
+
+            for val in iterable:
+                yield val
+
+        return nestedFunction
+
+    return deeply
+
+
 @invertibleGenerator
 def genAfterLoop(iterable):
 
@@ -168,3 +186,10 @@ class TestEquivalence(unittest.TestCase):
         assertEqualPipelines(
             genTwoLoops,
             genTwoLoops.co, l)
+
+    @parameterized.expand(testParameters)
+    def test_deep_nesting(self, _, l):
+        func = really()()
+        assertEqualPipelines(
+            func,
+            func.co, l)
