@@ -29,13 +29,13 @@ def genAfterLoop(iterable):
     for val in iterable:
         yield val
 
-    yield 42
+    yield exampleGlobal
 
 
 @invertibleGenerator
 def genBeforeLoop(iterable):
 
-    yield 42
+    yield exampleGlobal
 
     for val in iterable:
         yield val
