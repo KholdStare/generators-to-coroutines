@@ -4,6 +4,7 @@ import copy
 import six
 import random
 import sys
+import textwrap
 
 
 if sys.version_info[0] == 3 and sys.version_info[1] > 2:
@@ -184,7 +185,7 @@ class RemoveDecorators(ast.NodeTransformer):
         return node
 
 
-def transformAstWith(globalEnv, transformers):
+def transformAstWith(globalEnv, localEnv, transformers):
     """ Create a decorator that transforms functions in a given global
     environment, using the provided NodeTransformer classes """
 
@@ -196,7 +197,7 @@ def transformAstWith(globalEnv, transformers):
         funcName = func.__name__
 
         # TODO: need to unindent if method or local function
-        node = ast.parse(inspect.getsource(func))
+        node = ast.parse(textwrap.dedent(inspect.getsource(func)))
 
         #print "BEFORE: "
         #print astpp.dump(node)
@@ -210,8 +211,11 @@ def transformAstWith(globalEnv, transformers):
         ast.fix_missing_locations(node)
         compiled = compile(node, '<string>', 'exec')
 
-        tempNamespace = copy.copy(globalEnv)
-        six.exec_(compiled, tempNamespace)
+        tempNamespace = copy.copy(localEnv)
+        six.exec_(
+            compiled,
+            copy.copy(globalEnv),
+            tempNamespace)
 
         return tempNamespace[funcName]
 

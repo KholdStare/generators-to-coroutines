@@ -15,9 +15,12 @@ def invertibleGenerator(func):
     """ Add a co method to a generator function, that is the equivalent
     coroutine. """
 
-    globalEnv = inspect.stack()[1][0].f_globals
+    nextFrame = inspect.stack()[1]
 
     func.co = coroutine(
-        transformAstWith(globalEnv, [InvertGenerator])(func)
+        transformAstWith(
+            nextFrame[0].f_globals,
+            nextFrame[0].f_locals,
+            [InvertGenerator])(func)
     )
     return func
