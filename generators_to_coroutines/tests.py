@@ -1,6 +1,7 @@
-import unittest
 from . import tools
-from .decorators import invertibleGenerator, coroutine
+from .decorators import hasInvertibleMethods, invertibleGenerator, coroutine
+
+import unittest
 from nose.tools import assert_equal
 from nose_parameterized import parameterized
 
@@ -88,6 +89,30 @@ def coTwoLoops(target):
         notDone = False
 
     target.send("done")
+
+
+@hasInvertibleMethods
+class ClassWithGeneratorMethod(object):
+
+    exampleClassLocal = 23
+
+    def __init__(self, val):
+        self.val = val
+
+    def getGlobal(self):
+        return exampleGlobal
+
+    @invertibleGenerator
+    def gen(self, iterable):
+
+        yield self.val
+        yield self.getGlobal()
+
+        for elem in iterable:
+            yield elem
+
+        # TODO: limitation - cannot refer directly to ClassWithGeneratorMethod
+        yield self.exampleClassLocal
 
 
 class DummyCoroutine(object):
@@ -186,6 +211,13 @@ class TestEquivalence(unittest.TestCase):
         assertEqualPipelines(
             genTwoLoops,
             genTwoLoops.co, l)
+
+    @parameterized.expand(testParameters)
+    def test_class_method(self, _, l):
+        obj = ClassWithGeneratorMethod(7)
+        assertEqualPipelines(
+            obj.gen,
+            obj.gen.co, l)
 
     @parameterized.expand(testParameters)
     def test_deep_nesting(self, _, l):

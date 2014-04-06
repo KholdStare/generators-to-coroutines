@@ -1,1 +1,2 @@
-from .decorators import invertibleGenerator
+from .decorators import invertibleGenerator, hasInvertibleMethods
+from . import tools

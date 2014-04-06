@@ -196,7 +196,6 @@ def transformAstWith(globalEnv, localEnv, transformers):
     def transformDecorator(func):
         funcName = func.__name__
 
-        # TODO: need to unindent if method or local function
         node = ast.parse(textwrap.dedent(inspect.getsource(func)))
 
         #print "BEFORE: "
