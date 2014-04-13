@@ -78,6 +78,22 @@ def genUsingNext(iterable):
         pass
 
 
+@invertibleGenerator
+def genUsingForAndNext(iterable):
+
+    yield exampleGlobal
+
+    iterator = iterable.__iter__()
+
+    for val in iterator:
+        if val % 2 == 0:
+            yield val * 10
+            if six.PY3:
+                yield iterator.__next__()
+            else:
+                yield iterator.next()
+
+
 @coroutine
 def coTwoLoops(target):
     notDone = True
@@ -258,3 +274,9 @@ class TestEquivalence(unittest.TestCase):
         assertEqualPipelines(
             genUsingNext,
             genUsingNext.co, l)
+
+    @parameterized.expand(testParameters)
+    def test_using_for_and_next(self, _, l):
+        assertEqualPipelines(
+            genUsingForAndNext,
+            genUsingForAndNext.co, l)

@@ -124,11 +124,13 @@ class AnalyzeGeneratorFunction(ast.NodeVisitor):
 
         return self.functionArgumentIds is not None and \
             isinstance(node.iter, ast.Name) and \
-            node.iter.id in self.functionArgumentIds
+            (node.iter.id in self.functionArgumentIds or
+             node.iter.id in self.iteratorIdSet)
 
     def _saveTarget(self, iterableNode):
         if self.target is not None:
-            if self.target.id != iterableNode.id:
+            if self.target.id != iterableNode.id and \
+                    iterableNode.id not in self.iteratorIdSet:
                 raise Exception(
                     "Two different iterables that are parameters to the "
                     "generator are used for pulling values. Cannot "
