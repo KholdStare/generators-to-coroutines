@@ -49,8 +49,11 @@ class AnalyzeGeneratorFunction(ast.NodeVisitor):
         if self.isForStatementCandidate(node):
             self.loopsToBeConverted.add(node)
             if self.target is not None:
-                # TODO: raise exception if different target!
-                pass
+                if self.target.id != node.iter.id:
+                    raise Exception(
+                        "Two different iterables that are parameters to the "
+                        "generator are used for pulling values. Cannot "
+                        "convert to a Coroutine.")
             else:
                 # save the iterable, which will be now used as a target
                 # instead.

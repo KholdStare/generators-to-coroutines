@@ -2,7 +2,7 @@ from . import tools
 from .decorators import hasInvertibleMethods, invertibleGenerator, coroutine
 
 import unittest
-from nose.tools import assert_equal
+from nose.tools import assert_equal, raises
 from nose_parameterized import parameterized
 
 
@@ -225,3 +225,14 @@ class TestEquivalence(unittest.TestCase):
         assertEqualPipelines(
             func,
             func.co, l)
+
+    @raises(Exception)
+    def test_cannot_convert_two_iterable_generator(self):
+        def twoInput(in1, in2):
+            for i1 in in1:
+                yield i1
+
+            for i2 in in2:
+                yield i2
+
+        invertibleGenerator(twoInput)
