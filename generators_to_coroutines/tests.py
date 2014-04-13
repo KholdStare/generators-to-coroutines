@@ -77,6 +77,8 @@ def genUsingNext(iterable):
     except StopIteration:
         pass
 
+    yield exampleGlobal
+
 
 @invertibleGenerator
 def genUsingForAndNext(iterable):

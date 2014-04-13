@@ -41,6 +41,9 @@ class AnalyzeGeneratorFunction(ast.NodeVisitor):
         # "iterator.next()" calls to be converted to "(yield)"
         self.nextCallsToBeConverted = set()
 
+        # "except StopIteration:" to be converted to "except GeneratorExit:"
+        self.stopIterationsToBeConverted = set()
+
     @classmethod
     def _doesCallHaveNoParameters(cls, callNode):
         return len(callNode.args) == 0 and \
@@ -149,7 +152,20 @@ class AnalyzeGeneratorFunction(ast.NodeVisitor):
 
         self.generic_visit(node)
 
+    def visit_ExceptHandler(self, node):
+        """ Detect any "StopIteration" exception handlers, and and mark them
+        for conversion to GeneratorExit """
+
+        if isinstance(node.type, ast.Name) and \
+                node.type.id == 'StopIteration' and \
+                isinstance(node.type.ctx, ast.Load):
+
+            self.stopIterationsToBeConverted.add(node.type)
+
+        self.generic_visit(node)
+
     def visit_Name(self, node):
+        """ Remember any used variable names. """
 
         if isinstance(node.ctx, ast.Load):
             self.loadedNames.add(node.id)
@@ -211,6 +227,9 @@ class InvertGenerator(ast.NodeTransformer):
 
         if node in self.analysis.nextCallsToBeConverted:
             return ast.Yield(value=None)
+
+        if node in self.analysis.stopIterationsToBeConverted:
+            return ast.Name(id='GeneratorExit', ctx=ast.Load())
 
         return super(InvertGenerator, self).visit(node)
 
