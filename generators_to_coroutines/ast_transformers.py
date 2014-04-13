@@ -23,11 +23,94 @@ else:
 class AnalyzeGeneratorFunction(ast.NodeVisitor):
 
     def __init__(self):
+        # ids of all accessed variables, to aid in finding nonconflicting
+        # identifiers
         self.loadedNames = set()
-        # store statements that come after loops
+
         self.loopsToBeConverted = set()
+        # ids of all function arguments
         self.functionArgumentIds = None
         self.target = None
+
+        # ids of variables used as iterators
+        self.iteratorIdSet = set()
+
+        # nodes that are unnecessary in coroutine
+        self.nodesToBeDeleted = set()
+
+        # "iterator.next()" calls to be converted to "(yield)"
+        self.nextCallsToBeConverted = set()
+
+    @classmethod
+    def _doesCallHaveNoParameters(cls, callNode):
+        return len(callNode.args) == 0 and \
+            len(callNode.keywords) == 0 and \
+            callNode.starargs is None and \
+            callNode.kwargs is None
+
+    @classmethod
+    def _doesCallInvokeMethod(cls, methodName, callNode):
+        return isinstance(callNode.func, ast.Attribute) and \
+            callNode.func.attr == methodName and \
+            isinstance(callNode.func.ctx, ast.Load)
+
+    @classmethod
+    def _doesCallGetIterator(cls, callNode):
+        noParameters = cls._doesCallHaveNoParameters(callNode)
+        iterCall = cls._doesCallInvokeMethod('__iter__', callNode)
+
+        return iterCall and noParameters
+
+    @classmethod
+    def _extractObjectIdFromMethodCall(cls, callNode):
+        if isinstance(callNode.func.value, ast.Name) and \
+                isinstance(callNode.func.value.ctx, ast.Load):
+            return callNode.func.value.id
+
+    @classmethod
+    def _doesCallGetNext(cls, callNode):
+        noParameters = cls._doesCallHaveNoParameters(callNode)
+        # deal with python 3 compatibility and six library
+        nextCall = cls._doesCallInvokeMethod('next', callNode) or \
+            cls._doesCallInvokeMethod('__next__', callNode)
+
+        return nextCall and noParameters
+
+    def visit_Call(self, node):
+        """ check for expressions
+            iterator.next()
+        and remember the node """
+
+        if self._doesCallGetNext(node):
+            potentialIteratorId = self._extractObjectIdFromMethodCall(node)
+
+            if potentialIteratorId in self.iteratorIdSet or \
+                    potentialIteratorId in self.functionArgumentIds:
+                self.nextCallsToBeConverted.add(node)
+
+        self.generic_visit(node)
+
+    def visit_Assign(self, node):
+        """ check for statements like
+            iterator = iterable.__iter__()
+        and remember the iterator """
+
+        if len(node.targets) == 1 and \
+                isinstance(node.value, ast.Call) and \
+                self._doesCallGetIterator(node.value):
+            potentialIterableId = \
+                self._extractObjectIdFromMethodCall(node.value)
+
+            # TODO: perhaps not enough to just check function argument IDs
+            # need to bundle the iterable it came from?
+            if potentialIterableId in self.functionArgumentIds:
+                self._saveTarget(ast.Name(
+                    id=potentialIterableId,
+                    ctx=ast.Load()))
+                self.iteratorIdSet.add(node.targets[0].id)
+                self.nodesToBeDeleted.add(node)
+
+        self.generic_visit(node)
 
     def visit_FunctionDef(self, node):
         """ Gather function arguments for use later. """
@@ -43,21 +126,24 @@ class AnalyzeGeneratorFunction(ast.NodeVisitor):
             isinstance(node.iter, ast.Name) and \
             node.iter.id in self.functionArgumentIds
 
+    def _saveTarget(self, iterableNode):
+        if self.target is not None:
+            if self.target.id != iterableNode.id:
+                raise Exception(
+                    "Two different iterables that are parameters to the "
+                    "generator are used for pulling values. Cannot "
+                    "convert to a Coroutine.")
+        else:
+            # save the iterable, which will be now used as a target
+            # instead.
+            self.target = iterableNode
+
     def visit_For(self, node):
         """ Change iteration into while-yield statements """
 
         if self.isForStatementCandidate(node):
             self.loopsToBeConverted.add(node)
-            if self.target is not None:
-                if self.target.id != node.iter.id:
-                    raise Exception(
-                        "Two different iterables that are parameters to the "
-                        "generator are used for pulling values. Cannot "
-                        "convert to a Coroutine.")
-            else:
-                # save the iterable, which will be now used as a target
-                # instead.
-                self.target = node.iter
+            self._saveTarget(node.iter)
 
         self.generic_visit(node)
 
@@ -107,11 +193,22 @@ class InvertGenerator(ast.NodeTransformer):
         if self.analysis is None:
             self.analysis = AnalyzeGeneratorFunction()
             self.analysis.visit(node)
-            self.loopsToBeWrapped = copy.copy(self.analysis.loopsToBeConverted)
 
+            if self.analysis.target is None:
+                raise Exception(
+                    "Analysis did not find an iterable input to "
+                    "the Generator. Conversion to a Coroutine cannot be done.")
+
+            self.loopsToBeWrapped = copy.copy(self.analysis.loopsToBeConverted)
             self.moreValuesAvailableId = "moreValuesAvailable"
             while self.moreValuesAvailableId in self.analysis.loadedNames:
                 self.moreValuesAvailableId += str(random.randint(0, 1000000))
+
+        if node in self.analysis.nodesToBeDeleted:
+            return ast.Pass()
+
+        if node in self.analysis.nextCallsToBeConverted:
+            return ast.Yield(value=None)
 
         return super(InvertGenerator, self).visit(node)
 

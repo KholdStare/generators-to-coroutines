@@ -2,6 +2,7 @@ from . import tools
 from .decorators import hasInvertibleMethods, invertibleGenerator, coroutine
 
 import unittest
+import six
 from nose.tools import assert_equal, raises
 from nose_parameterized import parameterized
 
@@ -60,6 +61,21 @@ def genTwoLoops(iterable):
         yield "second " + str(val)
 
     yield "done"
+
+
+@invertibleGenerator
+def genUsingNext(iterable):
+
+    iterator = iterable.__iter__()
+
+    try:
+        while True:
+            if six.PY3:
+                yield iterator.__next__()
+            else:
+                yield iterator.next()
+    except StopIteration:
+        pass
 
 
 @coroutine
@@ -236,3 +252,9 @@ class TestEquivalence(unittest.TestCase):
                 yield i2
 
         invertibleGenerator(twoInput)
+
+    @parameterized.expand(testParameters)
+    def test_using_next(self, _, l):
+        assertEqualPipelines(
+            genUsingNext,
+            genUsingNext.co, l)
