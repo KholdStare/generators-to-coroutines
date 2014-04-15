@@ -1,6 +1,6 @@
 # Turn your generators into coroutines!
 
-[![Build Status](https://travis-ci.org/KholdStare/generators-to-coroutines.svg?branch=master)](https://travis-ci.org/KholdStare/generators-to-coroutines)
+[![Build Status](https://travis-ci.org/KholdStare/generators-to-coroutines.svg?branch=master)](https://travis-ci.org/KholdStare/generators-to-coroutines?branch=master)
 [![PyPI version](https://badge.fury.io/py/generators-to-coroutines.png)](http://badge.fury.io/py/generators-to-coroutines)
 
 ## TL;DR
@@ -81,9 +81,11 @@ can be done by manipulating the AST of the generator, with the
 This package is very much experimental and a proof of concept! A lot more could
 be done.
 
-* Currently centered around conversion of `for` loops.
-* Does not yet convert calls to `.next()` on iterators
-* Not tested with methods
-* Conversion is currently best-effort - no warnings/errors if impossible.
+Conversion is currently best-effort - some more complex generators will be
+converted to coroutines with a slightly different exit point - mainly due to
+different behaviour between `StopIteration` and `GeneratorExit`. Some obvious
+cases that cannot be converted will result in an `Exception` during conversion.
+It would be beneficial to raise an `Exception` in all cases where the
+conversion isn't guaranteed to be perfect.
 
 [cocourse]: http://www.dabeaz.com/coroutines/

@@ -5,7 +5,7 @@ from setuptools import setup
 
 setup(
     name="generators-to-coroutines",
-    version="0.1.0",
+    version="0.2.0",
     url="https://github.com/kholdstare/generators-to-coroutines",
     author="Alexander Kondratskiy",
     author_email="kholdstare0.0@gmail.com",
