@@ -14,10 +14,10 @@ else:
 
 if six.PY3:
     def getFunctionArgumentIdentifiers(node):
-        return [arg.arg for arg in node.args.args]
+        return set(arg.arg for arg in node.args.args)
 else:
     def getFunctionArgumentIdentifiers(node):
-        return [arg.id for arg in node.args.args]
+        return set(arg.id for arg in node.args.args)
 
 
 class AnalyzeGeneratorFunction(ast.NodeVisitor):
